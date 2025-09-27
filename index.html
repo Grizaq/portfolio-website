@@ -845,12 +845,17 @@
             
             // First try to get folder list from a projects.txt file (if exists)
             try {
+                console.log('Trying to load projects.txt...');
                 const projectsListResponse = await fetch('projects.txt');
+                console.log('projects.txt response status:', projectsListResponse.status);
                 if (projectsListResponse.ok) {
                     const projectsList = await projectsListResponse.text();
+                    console.log('projects.txt content:', projectsList);
                     projectFolders = projectsList.split('\n').map(line => line.trim()).filter(line => line);
+                    console.log('Parsed project folders:', projectFolders);
                 }
             } catch (e) {
+                console.error('Error loading projects.txt:', e);
                 // If no projects.txt file, use your actual folder names
                 projectFolders = [
                     'crash_1',
@@ -952,20 +957,55 @@
                 }
             }
 
-            // Load gallery images with better detection
+            // NEW: Load gallery images efficiently using gallery_count.txt
+            let galleryCount = 0;
+            try {
+                const countResponse = await fetch(`${projectPath}/gallery_count.txt`);
+                if (countResponse.ok) {
+                    galleryCount = parseInt((await countResponse.text()).trim()) || 0;
+                    console.log(`Gallery count file found: ${galleryCount} images`);
+                }
+            } catch {
+                console.log(`No gallery_count.txt found for ${projectPath}, using auto-detection`);
+            }
+
             const galleryImageExtensions = ['jpg', 'jpeg', 'png', 'webp'];
-            for (let i = 1; i <= 20; i++) { // Check for up to 20 gallery images
-                for (const ext of galleryImageExtensions) {
-                    try {
-                        const response = await fetch(`${projectPath}/gallery/${i}.${ext}`, { method: 'HEAD' });
-                        if (response.ok) {
-                            project.images.push(`${projectPath}/gallery/${i}.${ext}`);
-                            console.log(`Found gallery image: ${projectPath}/gallery/${i}.${ext}`);
-                            break;
+            
+            if (galleryCount > 0) {
+                // Use the specified count - much faster!
+                for (let i = 1; i <= galleryCount; i++) {
+                    for (const ext of galleryImageExtensions) {
+                        try {
+                            const response = await fetch(`${projectPath}/gallery/${i}.${ext}`, { method: 'HEAD' });
+                            if (response.ok) {
+                                project.images.push(`${projectPath}/gallery/${i}.${ext}`);
+                                console.log(`Found gallery image: ${projectPath}/gallery/${i}.${ext}`);
+                                break;
+                            }
+                        } catch (e) {
+                            // Continue to next extension
                         }
-                    } catch (e) {
-                        // Image doesn't exist, continue
                     }
+                }
+            } else {
+                // Fallback: auto-detect but limit to 10 for performance
+                for (let i = 1; i <= 10; i++) {
+                    let found = false;
+                    for (const ext of galleryImageExtensions) {
+                        try {
+                            const response = await fetch(`${projectPath}/gallery/${i}.${ext}`, { method: 'HEAD' });
+                            if (response.ok) {
+                                project.images.push(`${projectPath}/gallery/${i}.${ext}`);
+                                console.log(`Found gallery image: ${projectPath}/gallery/${i}.${ext}`);
+                                found = true;
+                                break;
+                            }
+                        } catch (e) {
+                            // Image doesn't exist, continue
+                        }
+                    }
+                    // If we didn't find image i, stop looking for i+1, i+2, etc.
+                    if (!found && i > 3) break;
                 }
             }
 
