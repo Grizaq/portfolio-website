@@ -1,57 +1,43 @@
-async function generateProjectsJSON() {
-    const projectFolders = ['crash_1', 'crash_2', 'crash_3'];
-    const projects = [];
-    
-    for (const folder of projectFolders) {
-        const project = { id: folder, images: [] };
-        
-        try {
-            // Load title
-            const titleResp = await fetch(`projects/${folder}/title.txt`);
-            project.title = titleResp.ok ? (await titleResp.text()).trim() : folder;
-            
-            // Load category
-            const catResp = await fetch(`projects/${folder}/category.txt`);
-            project.category = catResp.ok ? (await catResp.text()).trim() : 'Design';
-            
-            // Load description
-            const descResp = await fetch(`projects/${folder}/description.txt`);
-            project.description = descResp.ok ? (await descResp.text()).trim() : 'Project description';
-            
-            // Load tags
-            const tagsResp = await fetch(`projects/${folder}/tags.txt`);
-            const tagsText = tagsResp.ok ? await tagsResp.text() : 'Design';
-            project.tags = tagsText.trim().split(',').map(t => t.trim());
-            
-            // Set main image
-            project.mainImage = `projects/${folder}/main.jpg`;
-            
-            // Load gallery count
-            const countResp = await fetch(`projects/${folder}/gallery_count.txt`);
-            const count = countResp.ok ? parseInt((await countResp.text()).trim()) : 3;
-            
-            // Generate gallery images array
-            for (let i = 1; i <= count; i++) {
-                project.images.push(`projects/${folder}/gallery/${i}.jpg`);
-            }
-            
-            projects.push(project);
-            console.log(`Generated project: ${project.title}`);
-        } catch (error) {
-            console.error(`Error processing ${folder}:`, error);
-        }
+{
+  "projects": [
+    {
+      "id": "crash_1",
+      "title": "Crash Bandicoot 1",
+      "category": "Games",
+      "description": "Crash Bandicoot is a 1996 platform game developed by Naughty Dog and published by Sony Computer Entertainment for the PlayStation. The player controls Crash, a bandicoot created by the mad scientist Doctor Neo Cortex",
+      "tags": ["Gaming", "PlayStation", "Platform", "Retro"],
+      "mainImage": "projects/crash_1/main.jpg",
+      "images": [
+        "projects/crash_1/gallery/1.jpg",
+        "projects/crash_1/gallery/2.jpg",
+        "projects/crash_1/gallery/3.jpg"
+      ]
+    },
+    {
+      "id": "crash_2",
+      "title": "Crash Bandicoot 2",
+      "category": "Games",
+      "description": "Crash Bandicoot 2: Cortex Strikes Back is a 1997 platform game developed by Naughty Dog and published by Sony Computer Entertainment for the PlayStation. It is a sequel to Crash Bandicoot, and is part of the Crash Bandicoot series",
+      "tags": ["Gaming", "PlayStation", "Platform", "Sequel"],
+      "mainImage": "projects/crash_2/main.jpg",
+      "images": [
+        "projects/crash_2/gallery/1.jpg",
+        "projects/crash_2/gallery/2.jpg",
+        "projects/crash_2/gallery/3.jpg"
+      ]
+    },
+    {
+      "id": "crash_3",
+      "title": "Crash Bandicoot 3",
+      "category": "Games",
+      "description": "Crash Bandicoot: Warped, known in Europe as Crash Bandicoot 3: Warped, is a 1998 platform game developed by Naughty Dog and published by Sony Computer Entertainment for the PlayStation. It is the third game in the Crash Bandicoot video game series following Crash Bandicoot 2: Cortex Strikes Back",
+      "tags": ["Gaming", "PlayStation", "Platform", "Time Travel"],
+      "mainImage": "projects/crash_3/main.jpg",
+      "images": [
+        "projects/crash_3/gallery/1.jpg",
+        "projects/crash_3/gallery/2.jpg",
+        "projects/crash_3/gallery/3.jpg"
+      ]
     }
-    
-    const jsonOutput = {
-        projects: projects
-    };
-    
-    console.log('Generated projects.json:');
-    console.log(JSON.stringify(jsonOutput, null, 2));
-    
-    // Copy to clipboard
-    navigator.clipboard.writeText(JSON.stringify(jsonOutput, null, 2));
-    console.log('JSON copied to clipboard! Paste it into projects.json file');
-    
-    return jsonOutput;
+  ]
 }
