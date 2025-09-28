@@ -839,8 +839,30 @@
 
         // Load projects from folder structure
         async function loadProjects() {
-            const projectsFolder = 'projects/';
-            // Try to automatically detect project folders
+            const loadingIndicator = document.getElementById('projectsLoading');
+            const projectsGrid = document.getElementById('projectsGrid');
+
+            try {
+                console.log('Trying to load projects.json...');
+                
+                // Try to load from single JSON file first (fastest method)
+                const jsonResponse = await fetch('projects.json');
+                if (jsonResponse.ok) {
+                    const jsonData = await jsonResponse.json();
+                    console.log('Loaded projects from JSON:', jsonData);
+                    projectsData = jsonData.projects || jsonData;
+                    
+                    // Hide loading, show projects
+                    loadingIndicator.style.display = 'none';
+                    projectsGrid.style.display = 'grid';
+                    renderProjects();
+                    return;
+                }
+            } catch (error) {
+                console.log('No projects.json found, falling back to individual files...');
+            }
+
+            // Fallback to individual file loading (slower method)
             let projectFolders = [];
             
             // First try to get folder list from a projects.txt file (if exists)
@@ -864,10 +886,8 @@
                 ];
             }
 
-            const loadingIndicator = document.getElementById('projectsLoading');
-            const projectsGrid = document.getElementById('projectsGrid');
-
             try {
+                const projectsFolder = 'projects/';
                 for (const folderName of projectFolders) {
                     try {
                         const project = await loadProjectData(projectsFolder + folderName);

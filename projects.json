@@ -1,0 +1,57 @@
+async function generateProjectsJSON() {
+    const projectFolders = ['crash_1', 'crash_2', 'crash_3'];
+    const projects = [];
+    
+    for (const folder of projectFolders) {
+        const project = { id: folder, images: [] };
+        
+        try {
+            // Load title
+            const titleResp = await fetch(`projects/${folder}/title.txt`);
+            project.title = titleResp.ok ? (await titleResp.text()).trim() : folder;
+            
+            // Load category
+            const catResp = await fetch(`projects/${folder}/category.txt`);
+            project.category = catResp.ok ? (await catResp.text()).trim() : 'Design';
+            
+            // Load description
+            const descResp = await fetch(`projects/${folder}/description.txt`);
+            project.description = descResp.ok ? (await descResp.text()).trim() : 'Project description';
+            
+            // Load tags
+            const tagsResp = await fetch(`projects/${folder}/tags.txt`);
+            const tagsText = tagsResp.ok ? await tagsResp.text() : 'Design';
+            project.tags = tagsText.trim().split(',').map(t => t.trim());
+            
+            // Set main image
+            project.mainImage = `projects/${folder}/main.jpg`;
+            
+            // Load gallery count
+            const countResp = await fetch(`projects/${folder}/gallery_count.txt`);
+            const count = countResp.ok ? parseInt((await countResp.text()).trim()) : 3;
+            
+            // Generate gallery images array
+            for (let i = 1; i <= count; i++) {
+                project.images.push(`projects/${folder}/gallery/${i}.jpg`);
+            }
+            
+            projects.push(project);
+            console.log(`Generated project: ${project.title}`);
+        } catch (error) {
+            console.error(`Error processing ${folder}:`, error);
+        }
+    }
+    
+    const jsonOutput = {
+        projects: projects
+    };
+    
+    console.log('Generated projects.json:');
+    console.log(JSON.stringify(jsonOutput, null, 2));
+    
+    // Copy to clipboard
+    navigator.clipboard.writeText(JSON.stringify(jsonOutput, null, 2));
+    console.log('JSON copied to clipboard! Paste it into projects.json file');
+    
+    return jsonOutput;
+}
