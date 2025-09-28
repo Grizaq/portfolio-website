@@ -837,301 +837,43 @@
         let currentProject = '';
         let currentImageIndex = 0;
 
-        // Load projects from folder structure
+        // Load projects from JSON file only
         async function loadProjects() {
             const loadingIndicator = document.getElementById('projectsLoading');
             const projectsGrid = document.getElementById('projectsGrid');
 
             try {
-                console.log('Trying to load projects.json...');
+                console.log('Loading projects from JSON...');
+                const response = await fetch('projects.json');
                 
-                // Try to load from single JSON file first (fastest method)
-                const jsonResponse = await fetch('projects.json');
-                if (jsonResponse.ok) {
-                    const jsonData = await jsonResponse.json();
-                    console.log('Loaded projects from JSON:', jsonData);
-                    projectsData = jsonData.projects || jsonData;
-                    
-                    // Hide loading, show projects
-                    loadingIndicator.style.display = 'none';
-                    projectsGrid.style.display = 'grid';
-                    renderProjects();
-                    return;
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: Could not find projects.json`);
                 }
-            } catch (error) {
-                console.log('No projects.json found, falling back to individual files...');
-            }
-
-            // Fallback to individual file loading (slower method)
-            let projectFolders = [];
-            
-            // First try to get folder list from a projects.txt file (if exists)
-            try {
-                console.log('Trying to load projects.txt...');
-                const projectsListResponse = await fetch('projects.txt');
-                console.log('projects.txt response status:', projectsListResponse.status);
-                if (projectsListResponse.ok) {
-                    const projectsList = await projectsListResponse.text();
-                    console.log('projects.txt content:', projectsList);
-                    projectFolders = projectsList.split('\n').map(line => line.trim()).filter(line => line);
-                    console.log('Parsed project folders:', projectFolders);
-                }
-            } catch (e) {
-                console.error('Error loading projects.txt:', e);
-                // If no projects.txt file, use your actual folder names
-                projectFolders = [
-                    'crash_1',
-                    'crash_2',
-                    'crash_3'
-                ];
-            }
-
-            try {
-                const projectsFolder = 'projects/';
-                for (const folderName of projectFolders) {
-                    try {
-                        const project = await loadProjectData(projectsFolder + folderName);
-                        if (project) {
-                            projectsData.push(project);
-                        }
-                    } catch (error) {
-                        console.log(`Skipping ${folderName}:`, error.message);
-                        // Create fallback project with placeholder data
-                        const fallbackProject = createFallbackProject(folderName);
-                        projectsData.push(fallbackProject);
-                    }
-                }
-
+                
+                const data = await response.json();
+                projectsData = data.projects || data;
+                console.log('Projects loaded successfully:', projectsData);
+                
                 // Hide loading, show projects
                 loadingIndicator.style.display = 'none';
                 projectsGrid.style.display = 'grid';
-                
-                // Render projects
                 renderProjects();
-
+                
             } catch (error) {
                 console.error('Error loading projects:', error);
-                loadingIndicator.innerHTML = 'Error loading projects. Using placeholder data.';
-                
-                // Use all fallback projects
-                projectsData = projectFolders.map(createFallbackProject);
-                
-                loadingIndicator.style.display = 'none';
-                projectsGrid.style.display = 'grid';
-                renderProjects();
+                loadingIndicator.innerHTML = `
+                    <p>Could not load projects.</p>
+                    <p style="font-size: 14px; margin-top: 10px; opacity: 0.7;">
+                        Make sure projects.json exists in your root directory.
+                    </p>
+                `;
             }
-        }
-
-        // Load individual project data from folder
-        async function loadProjectData(projectPath) {
-            const project = { id: projectPath.split('/').pop(), images: [] };
-
-            // Try to load project info with better error handling
-            try {
-                const titleResponse = await fetch(`${projectPath}/title.txt`);
-                if (titleResponse.ok) {
-                    project.title = (await titleResponse.text()).trim();
-                } else {
-                    // Try with .txt.txt extension (common mistake)
-                    const titleResponse2 = await fetch(`${projectPath}/title.txt.txt`);
-                    project.title = titleResponse2.ok ? (await titleResponse2.text()).trim() : 'Untitled Project';
-                }
-            } catch {
-                project.title = 'Untitled Project';
-            }
-
-            try {
-                const categoryResponse = await fetch(`${projectPath}/category.txt`);
-                project.category = categoryResponse.ok ? (await categoryResponse.text()).trim() : 'Design';
-            } catch {
-                project.category = 'Design';
-            }
-
-            try {
-                const descriptionResponse = await fetch(`${projectPath}/description.txt`);
-                project.description = descriptionResponse.ok ? (await descriptionResponse.text()).trim() : 'Project description';
-            } catch {
-                project.description = 'Project description';
-            }
-
-            try {
-                const tagsResponse = await fetch(`${projectPath}/tags.txt`);
-                const tagsText = tagsResponse.ok ? await tagsResponse.text() : 'Design';
-                project.tags = tagsText.trim().split(',').map(tag => tag.trim()).filter(tag => tag);
-            } catch {
-                project.tags = ['Design'];
-            }
-
-            // Load main image - try multiple extensions and check if file exists
-            const mainImageExtensions = ['jpg', 'jpeg', 'png', 'webp'];
-            for (const ext of mainImageExtensions) {
-                try {
-                    const response = await fetch(`${projectPath}/main.${ext}`, { method: 'HEAD' });
-                    if (response.ok) {
-                        project.mainImage = `${projectPath}/main.${ext}`;
-                        console.log(`Found main image: ${project.mainImage}`);
-                        break;
-                    }
-                } catch (e) {
-                    console.log(`No main.${ext} found for ${projectPath}`);
-                }
-            }
-
-            // NEW: Load gallery images efficiently using gallery_count.txt
-            let galleryCount = 0;
-            try {
-                const countResponse = await fetch(`${projectPath}/gallery_count.txt`);
-                if (countResponse.ok) {
-                    galleryCount = parseInt((await countResponse.text()).trim()) || 0;
-                    console.log(`Gallery count file found: ${galleryCount} images`);
-                }
-            } catch {
-                console.log(`No gallery_count.txt found for ${projectPath}, using auto-detection`);
-            }
-
-            const galleryImageExtensions = ['jpg', 'jpeg', 'png', 'webp'];
-            
-            if (galleryCount > 0) {
-                // Use the specified count - much faster!
-                for (let i = 1; i <= galleryCount; i++) {
-                    for (const ext of galleryImageExtensions) {
-                        try {
-                            const response = await fetch(`${projectPath}/gallery/${i}.${ext}`, { method: 'HEAD' });
-                            if (response.ok) {
-                                project.images.push(`${projectPath}/gallery/${i}.${ext}`);
-                                console.log(`Found gallery image: ${projectPath}/gallery/${i}.${ext}`);
-                                break;
-                            }
-                        } catch (e) {
-                            // Continue to next extension
-                        }
-                    }
-                }
-            } else {
-                // Fallback: auto-detect but limit to 10 for performance
-                for (let i = 1; i <= 10; i++) {
-                    let found = false;
-                    for (const ext of galleryImageExtensions) {
-                        try {
-                            const response = await fetch(`${projectPath}/gallery/${i}.${ext}`, { method: 'HEAD' });
-                            if (response.ok) {
-                                project.images.push(`${projectPath}/gallery/${i}.${ext}`);
-                                console.log(`Found gallery image: ${projectPath}/gallery/${i}.${ext}`);
-                                found = true;
-                                break;
-                            }
-                        } catch (e) {
-                            // Image doesn't exist, continue
-                        }
-                    }
-                    // If we didn't find image i, stop looking for i+1, i+2, etc.
-                    if (!found && i > 3) break;
-                }
-            }
-
-            // If no gallery images found, use main image
-            if (project.images.length === 0 && project.mainImage) {
-                project.images = [project.mainImage];
-            }
-
-            // If still no images, use placeholder
-            if (project.images.length === 0) {
-                project.mainImage = 'https://picsum.photos/800/600?random=' + Math.floor(Math.random() * 100);
-                project.images = [project.mainImage];
-            }
-
-            console.log(`Loaded project:`, project);
-            return project;
-        }
-
-        // Create fallback project with placeholder data
-        function createFallbackProject(folderName) {
-            const fallbackData = {
-                'sustainable-living': {
-                    title: 'Sustainable Living Co.',
-                    category: 'Brand Identity',
-                    description: 'A complete rebrand for an eco-friendly lifestyle company, including logo design, brand guidelines, and marketing materials that reflect their commitment to sustainability.',
-                    tags: ['Branding', 'Logo Design', 'Sustainability'],
-                    images: [
-                        'https://picsum.photos/800/600?random=21',
-                        'https://picsum.photos/800/600?random=22',
-                        'https://picsum.photos/800/600?random=23',
-                        'https://picsum.photos/800/600?random=24'
-                    ]
-                },
-                'meditation-app': {
-                    title: 'Mindful Meditation App',
-                    category: 'UI/UX Design',
-                    description: 'Designed a calming and intuitive mobile app experience for meditation practice, focusing on simplicity and user engagement through thoughtful interactions.',
-                    tags: ['UI Design', 'UX Design', 'Mobile'],
-                    images: [
-                        'https://picsum.photos/600/800?random=31',
-                        'https://picsum.photos/600/800?random=32',
-                        'https://picsum.photos/600/800?random=33'
-                    ]
-                },
-                'architecture-studio': {
-                    title: 'Architecture Studio',
-                    category: 'Web Design',
-                    description: 'A clean and modern website design for an architectural firm, showcasing their portfolio with elegant typography and immersive project galleries.',
-                    tags: ['Web Design', 'UI/UX', 'Typography'],
-                    images: [
-                        'https://picsum.photos/800/600?random=41',
-                        'https://picsum.photos/800/600?random=42',
-                        'https://picsum.photos/800/600?random=43'
-                    ]
-                },
-                'exhibition-catalog': {
-                    title: 'Art Exhibition Catalog',
-                    category: 'Print Design',
-                    description: 'A beautifully crafted exhibition catalog featuring contemporary artists, with careful attention to layout, color, and paper selection.',
-                    tags: ['Print Design', 'Editorial', 'Art Direction'],
-                    images: [
-                        'https://picsum.photos/600/800?random=51',
-                        'https://picsum.photos/600/800?random=52'
-                    ]
-                },
-                'coffee-roasters': {
-                    title: 'Artisan Coffee Roasters',
-                    category: 'Brand Identity',
-                    description: 'Brand identity and packaging design for a local coffee roastery, emphasizing craftsmanship and quality through authentic visual storytelling.',
-                    tags: ['Branding', 'Packaging', 'Illustration'],
-                    images: [
-                        'https://picsum.photos/800/600?random=61',
-                        'https://picsum.photos/800/600?random=62',
-                        'https://picsum.photos/800/600?random=63'
-                    ]
-                },
-                'tech-dashboard': {
-                    title: 'Tech Startup Dashboard',
-                    category: 'Digital Design',
-                    description: 'A comprehensive dashboard design for a fintech startup, focusing on data visualization and user-friendly interface design.',
-                    tags: ['Dashboard', 'Data Viz', 'UI Design'],
-                    images: [
-                        'https://picsum.photos/800/600?random=71',
-                        'https://picsum.photos/800/600?random=72'
-                    ]
-                }
-            };
-
-            const data = fallbackData[folderName] || {
-                title: folderName.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-                category: 'Design',
-                description: 'Creative design project showcasing innovative solutions.',
-                tags: ['Design'],
-                images: ['https://picsum.photos/800/600?random=' + Math.floor(Math.random() * 100)]
-            };
-
-            return {
-                id: folderName,
-                ...data,
-                mainImage: data.images[0]
-            };
         }
 
         // Render projects in the grid
         function renderProjects() {
             const projectsGrid = document.getElementById('projectsGrid');
+            projectsGrid.innerHTML = '';
             
             projectsData.forEach(project => {
                 const projectCard = document.createElement('div');
